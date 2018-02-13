@@ -1,9 +1,13 @@
 package cmd
 
 import (
+	"math/rand"
+	"time"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/warp-poke/poke-me/core"
 )
 
 var cfgFile string
@@ -60,5 +64,23 @@ var RootCmd = &cobra.Command{
 	Short: "Poke-me Warp10 runner deploy hook",
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info("Poke-me starting")
+
+		zk, err := core.NewZK(viper.GetStringSlice("zk.servers"), time.Second*10)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		znode, err := zk.ZNode("/poke-me/commit-id")
+		if err != nil {
+			log.Panic(err)
+		}
+
+		for v := range znode.Values {
+			log.Info(string(v))
+			time.Sleep(time.Duration(rand.Int63n(1500)) * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
+
+			znode.Update([]byte(time.Now().Format(time.RFC3339)))
+		}
 	},
 }

@@ -20,15 +20,15 @@ init:
 dep:
 	glide install
 
-build: pokeme.go $$(call rwildcard, ./cmd, *.go) $$(call rwildcard, ./core, *.go)
+build: poke-me.go $$(call rwildcard, ./cmd, *.go) $$(call rwildcard, ./core, *.go)
 	$(CC) $(DFLAGS) -ldflags "$(CFLAGS)" -o $(BUILD_DIR)/poke-me poke-me.go
 
 .PHONY: release
-release: poke-me.go $$(call rwildcard, ./cmd, *.go) $$(call rwildcard, ./core, *.go) $$(call rwildcard, ./catalyser, *.go)
+release: poke-me.go $$(call rwildcard, ./cmd, *.go) $$(call rwildcard, ./core, *.go)
 	$(CC) -ldflags "-s -w $(CFLAGS)" -o $(BUILD_DIR)/poke-me poke-me.go
 
 .PHONY: dist
-dist: poke-me.go $$(call rwildcard, ./cmd, *.go) $$(call rwildcard, ./core, *.go) $$(call rwildcard, ./catalyser, *.go)
+dist: poke-me.go $$(call rwildcard, ./cmd, *.go) $$(call rwildcard, ./core, *.go)
 	$(CROSS) $(CC) -ldflags "-s -w $(CFLAGS)" -o $(BUILD_DIR)/poke-me poke-me.go
 
 .PHONY: lint
