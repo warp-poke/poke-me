@@ -1,9 +1,11 @@
 package cmd
 
 import (
-	"math/rand"
+	"encoding/json"
+	"net/http"
 	"time"
 
+	"github.com/google/go-github/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -65,7 +67,32 @@ var RootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info("Poke-me starting")
 
-		zk, err := core.NewZK(viper.GetStringSlice("zk.servers"), time.Second*10)
+		sshKey := viper.GetString("cloner.ssh.key")
+		if sshKey == "" {
+			log.Fatal("Cannot do clone actions without SSH KEY")
+		}
+
+		gitURL := viper.GetString("cloner.git.url")
+		if gitURL == "" {
+			log.Fatal("Cannot clone repository without URI")
+		}
+
+		clonePath := viper.GetString("cloner.path")
+		if clonePath == "" {
+			log.Fatal("Cannot clone repository without path")
+		}
+
+		gitSecret := viper.GetString("cloner.git.secret")
+		if gitSecret == "" {
+			log.Fatal("Cannot clone repository without git secret")
+		}
+
+		zkServers := viper.GetStringSlice("zk.servers")
+		if len(zkServers) == 0 {
+			log.Fatal("Cannot connect to ZK without servers")
+		}
+
+		zk, err := core.NewZK(zkServers, time.Second*10)
 		if err != nil {
 			log.Panic(err)
 		}
@@ -75,12 +102,60 @@ var RootCmd = &cobra.Command{
 			log.Panic(err)
 		}
 
-		for v := range znode.Values {
+		/*for v := range znode.Values {
 			log.Info(string(v))
 			time.Sleep(time.Duration(rand.Int63n(1500)) * time.Millisecond)
 			time.Sleep(1000 * time.Millisecond)
 
 			znode.Update([]byte(time.Now().Format(time.RFC3339)))
+		}*/
+
+		c, err := core.NewCloner(sshKey, gitURL, clonePath)
+		if err != nil {
+			log.Fatal(err)
 		}
+
+		go func() {
+			for v := range znode.Values {
+				if len(v) == 0 {
+					continue
+				}
+
+				if err := c.Clone(string(v), true); err != nil {
+					log.WithError(err).Error("Failed to clone")
+				}
+			}
+		}()
+
+		http.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
+			body, err := github.ValidatePayload(r, []byte(gitSecret))
+			if err != nil {
+				log.WithError(err).Warn("Bad payload")
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+			}
+
+			var hook github.WebHookPayload
+			if err := json.Unmarshal(body, hook); err != nil {
+				log.WithError(err).Warn("Failed to unmarshal")
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+			}
+			// Send update on ZK
+			sha := hook.HeadCommit.ID
+			if sha == nil {
+				log.Error("Failed to get commit sha")
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Failed to get commit sha"))
+			}
+
+			if err := znode.Update([]byte(*sha)); err != nil {
+				log.WithError(err).Warn("Failed to set ZK value")
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(err.Error()))
+			}
+		})
+
+		log.Fatal(http.ListenAndServe("127.0.0.1:8080", nil))
 	},
 }

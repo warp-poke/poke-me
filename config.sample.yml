@@ -1,0 +1,7 @@
+zk.servers: 10.10.10.1
+cloner:
+  ssh.key: XXX
+  git:
+    url: ssh://git@github.com/warp-poke/scripts
+    secret: XXX
+  path: runner.clone.root
