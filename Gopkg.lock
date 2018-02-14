@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  branch = "master"
+  name = "github.com/cbroglie/mustache"
+  packages = ["."]
+  revision = "2eb171290cbdc792c57bcd10f5a030b53500b28f"
+
+[[projects]]
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
   revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
@@ -282,6 +288,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d2c8d341f3e434d03ef19162ad43573a67ad5b321b2f1ce3a6a9aca98bdd6127"
+  inputs-digest = "92df8b33c6c66007b4cb143ec12e7b4166cf68dc7fb3061896dde378187c494b"
   solver-name = "gps-cdcl"
   solver-version = 1

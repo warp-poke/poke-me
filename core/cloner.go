@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"strings"
 	"time"
 
+	"github.com/cbroglie/mustache"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	git "gopkg.in/src-d/go-git.v4"
@@ -44,27 +46,33 @@ func NewCloner(sshTransportKey, gitRepo, path string) (*Cloner, error) {
 }
 
 // Clone replace existing content by master
-func (c *Cloner) Clone(sha string, backup bool) error {
+func (c *Cloner) Clone(sha string, secrets map[string]string, backup bool) error {
 
 	if backup {
 		// Backup old scripts
 		backupFolder := fmt.Sprintf("%s.%s", c.path, time.Now())
-		if err := os.Rename(c.path, backupFolder); err != nil {
-			log.Error(err)
-			return fmt.Errorf("Failed to backup current scripts: %s", err.Error())
+		if _, err := os.Stat(c.path); err == nil {
+			if err := os.Rename(c.path, backupFolder); err != nil {
+				log.Error(err)
+				return fmt.Errorf("Failed to backup current scripts: %s", err.Error())
+			}
 		}
 	}
 
-	if err := os.RemoveAll(c.path); err != nil {
-		log.Error(err)
-		return fmt.Errorf("Failed to remove current scripts directory: %s", err.Error())
+	if _, err := os.Stat(c.path); err == nil {
+		if err := os.RemoveAll(c.path); err != nil {
+			log.Error(err)
+			return fmt.Errorf("Failed to remove current scripts directory: %s", err.Error())
+		}
 	}
 
-	repo, err := git.PlainClone(c.path, true, &git.CloneOptions{
-		URL:           c.gitRepo,
-		Auth:          c.sshTransportClient,
-		ReferenceName: plumbing.Master,
-		SingleBranch:  true,
+	if err := os.Mkdir(c.path, 777); err != nil {
+		log.WithError(err).Warn("Failed to create ws dir")
+	}
+
+	repo, err := git.PlainClone(c.path, false, &git.CloneOptions{
+		URL:  c.gitRepo,
+		Auth: c.sshTransportClient,
 	})
 	if err != nil {
 		log.Error(err)
@@ -73,7 +81,7 @@ func (c *Cloner) Clone(sha string, backup bool) error {
 
 	tree, err := repo.Worktree()
 	if err != nil {
-		log.Error(err)
+		log.WithError(err).Error("Failed to get worktree")
 		return err
 	}
 
@@ -82,8 +90,56 @@ func (c *Cloner) Clone(sha string, backup bool) error {
 		Force: true,
 	})
 	if err != nil {
-		log.Error(err)
+		log.WithError(err).Error("Failed to checkout")
 		return err
+	}
+
+	dirs, err := tree.Filesystem.ReadDir(".")
+	if err != nil {
+		log.WithError(err).Error("Failed to read dir")
+		return err
+	}
+
+	for k := range secrets {
+		log.Debug("known secret", k)
+	}
+
+	// Replace secrets
+	for _, dir := range dirs {
+		if !dir.IsDir() {
+			continue
+		}
+		if dir.Name() == ".git" {
+			continue
+		}
+		log.Debug("Scan dir %s", dir.Name())
+
+		files, err := tree.Filesystem.ReadDir(dir.Name())
+		if err != nil {
+			log.WithError(err).Error("Failed to read file")
+			return err
+		}
+
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+			log.Debug("Scan file %s", file.Name())
+
+			absFilePath := path.Join(c.path, dir.Name(), file.Name())
+
+			tplFile, err := mustache.RenderFile(absFilePath, secrets)
+			if err != nil {
+				log.WithError(err).Error("Failed to render file")
+				return err
+			}
+			log.Debug(tplFile)
+
+			if err := ioutil.WriteFile(absFilePath, []byte(tplFile), 777); err != nil {
+				log.WithError(err).Error("Failed to write file")
+				return err
+			}
+		}
 	}
 
 	return nil

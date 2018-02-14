@@ -29,6 +29,7 @@ func initConfig() {
 
 	// Default
 	viper.SetDefault("listen", "127.0.0.1:8080")
+	viper.SetDefault("secrets", map[string]string{})
 
 	// Bind environment variables
 	viper.SetEnvPrefix("poke-me")
@@ -122,7 +123,7 @@ var RootCmd = &cobra.Command{
 					continue
 				}
 
-				if err := c.Clone(string(v), true); err != nil {
+				if err := c.Clone(string(v), viper.GetStringMapString("secrets"), true); err != nil {
 					log.WithError(err).Error("Failed to clone")
 				}
 			}
