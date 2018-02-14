@@ -1,3 +1,4 @@
+listen: 127.0.0.1:8080
 zk.servers: 10.10.10.1
 cloner:
   ssh.key: XXX

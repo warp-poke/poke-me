@@ -28,6 +28,7 @@ func init() {
 func initConfig() {
 
 	// Default
+	viper.SetDefault("listen", "127.0.0.1:8080")
 
 	// Bind environment variables
 	viper.SetEnvPrefix("poke-me")
@@ -135,8 +136,8 @@ var RootCmd = &cobra.Command{
 				w.Write([]byte(err.Error()))
 			}
 
-			var hook github.WebHookPayload
-			if err := json.Unmarshal(body, hook); err != nil {
+			var hook core.WebHookPayload
+			if err := json.Unmarshal(body, &hook); err != nil {
 				log.WithError(err).Warn("Failed to unmarshal")
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(err.Error()))
@@ -156,6 +157,6 @@ var RootCmd = &cobra.Command{
 			}
 		})
 
-		log.Fatal(http.ListenAndServe("127.0.0.1:8080", nil))
+		log.Fatal(http.ListenAndServe(viper.GetString("listen"), nil))
 	},
 }
