@@ -1,9 +1,9 @@
 # Poke-me
 
-Poke-me help you to sync a Git repo and servers file systems.
+Poke-me help you to sync a Git repository and servers file systems.
 You have to register a Git repository in poke-me and a path.
 
-## Depedancies
+## Dependencies
 
 * Zookeeper
 
