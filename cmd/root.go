@@ -123,7 +123,7 @@ var RootCmd = &cobra.Command{
 					continue
 				}
 
-				if err := c.Clone(string(v), viper.GetStringMapString("secrets"), true); err != nil {
+				if err := c.Clone(string(v), viper.GetStringMapString("secrets"), false); err != nil {
 					log.WithError(err).Error("Failed to clone")
 				}
 			}

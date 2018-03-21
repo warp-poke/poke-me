@@ -66,7 +66,7 @@ func (c *Cloner) Clone(sha string, secrets map[string]string, backup bool) error
 		}
 	}
 
-	if err := os.Mkdir(c.path, 777); err != nil {
+	if err := os.Mkdir(c.path, os.ModePerm); err != nil {
 		log.WithError(err).Warn("Failed to create ws dir")
 	}
 
@@ -135,7 +135,7 @@ func (c *Cloner) Clone(sha string, secrets map[string]string, backup bool) error
 			}
 			log.Debug(tplFile)
 
-			if err := ioutil.WriteFile(absFilePath, []byte(tplFile), 777); err != nil {
+			if err := ioutil.WriteFile(absFilePath, []byte(tplFile), os.ModePerm); err != nil {
 				log.WithError(err).Error("Failed to write file")
 				return err
 			}
