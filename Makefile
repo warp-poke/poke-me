@@ -18,7 +18,7 @@ init:
 
 .PHONY: dep
 dep:
-	glide install
+	dep ensure
 
 build: poke-me.go $$(call rwildcard, ./cmd, *.go) $$(call rwildcard, ./core, *.go)
 	$(CC) $(DFLAGS) -ldflags "$(CFLAGS)" -o $(BUILD_DIR)/poke-me poke-me.go

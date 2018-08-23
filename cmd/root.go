@@ -89,19 +89,10 @@ var RootCmd = &cobra.Command{
 			log.Fatal("Cannot clone repository without git secret")
 		}
 
+		var znode *core.ZNode
 		zkServers := viper.GetStringSlice("zk.servers")
 		if len(zkServers) == 0 {
-			log.Fatal("Cannot connect to ZK without servers")
-		}
-
-		zk, err := core.NewZK(zkServers, time.Second*10)
-		if err != nil {
-			log.Panic(err)
-		}
-
-		znode, err := zk.ZNode("/poke-me/commit-id")
-		if err != nil {
-			log.Panic(err)
+			log.Warn("No ZK servers, running in standalone mode")
 		}
 
 		/*for v := range znode.Values {
@@ -117,17 +108,31 @@ var RootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		go func() {
-			for v := range znode.Values {
-				if len(v) == 0 {
-					continue
-				}
-
-				if err := c.Clone(string(v), viper.GetStringMapString("secrets"), false); err != nil {
-					log.WithError(err).Error("Failed to clone")
-				}
+		if len(zkServers) > 0 {
+			zk, err := core.NewZK(zkServers, time.Second*10)
+			if err != nil {
+				log.Panic(err)
 			}
-		}()
+
+			znode, err = zk.ZNode("/poke-me/commit-id")
+			if err != nil {
+				log.Panic(err)
+			}
+
+			go func() {
+				for v := range znode.Values {
+					if len(v) == 0 {
+						continue
+					}
+
+					log.WithField("sha", string(v)).Info("clonning")
+
+					if err := c.Clone(string(v), viper.GetStringMapString("secrets"), false); err != nil {
+						log.WithError(err).Error("Failed to clone")
+					}
+				}
+			}()
+		}
 
 		http.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
 			body, err := github.ValidatePayload(r, []byte(gitSecret))
@@ -151,10 +156,19 @@ var RootCmd = &cobra.Command{
 				w.Write([]byte("Failed to get commit sha"))
 			}
 
-			if err := znode.Update([]byte(*sha)); err != nil {
-				log.WithError(err).Warn("Failed to set ZK value")
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
+			if znode != nil {
+				if err := znode.Update([]byte(*sha)); err != nil {
+					log.WithError(err).Warn("Failed to set ZK value")
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte(err.Error()))
+				}
+			} else {
+				log.WithField("sha", *sha).Info("clonning")
+				if err := c.Clone(*sha, viper.GetStringMapString("secrets"), false); err != nil {
+					log.WithError(err).Error("Failed to clone")
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte(err.Error()))
+				}
 			}
 		})
 

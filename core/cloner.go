@@ -36,7 +36,7 @@ func NewCloner(sshTransportKey, gitRepo, path string) (*Cloner, error) {
 	if err != nil {
 		return nil, err
 	}
-	auth.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+	auth.HostKeyCallbackHelper.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 
 	return &Cloner{
 		sshTransportClient: auth,
@@ -71,8 +71,9 @@ func (c *Cloner) Clone(sha string, secrets map[string]string, backup bool) error
 	}
 
 	repo, err := git.PlainClone(c.path, false, &git.CloneOptions{
-		URL:  c.gitRepo,
-		Auth: c.sshTransportClient,
+		URL:   c.gitRepo,
+		Auth:  c.sshTransportClient,
+		Depth: 1,
 	})
 	if err != nil {
 		log.Error(err)
